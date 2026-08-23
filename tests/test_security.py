@@ -1,3 +1,5 @@
+import os
+import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from app.database.connection import db_manager
@@ -19,7 +21,7 @@ def test_validator_blocks_multiple_statements():
     is_safe, error = SQLValidator.is_safe("SELECT * FROM customers; DROP TABLE orders;")
     assert not is_safe
     assert "Multiple SQL statements" in error
-
+@pytest.mark.skipif(os.getenv("GITHUB_ACTIONS")== "true", reason="CI uses a superuser for a DB steup")
 def test_database_role_is_read_only():
     # We bypass the Python validator entirely by using the raw SQLAlchemy engine
     # to prove that the database itself rejects modifications.

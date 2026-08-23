@@ -10,6 +10,10 @@ app = FastAPI(
     description="AI-powered Text-to-SQL backend",
     version="1.0.0"
 )
+@app.get("/health")
+def health_check():
+    """Simple health check endpoint."""
+    return {"status": "healthy"}
 
 @app.post("/api/v1/query", response_model=QueryResponse)
 def ask_database(request: QueryRequest):

@@ -1,6 +1,8 @@
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, HTTPException
 from app.schemas.api import QueryRequest, QueryResponse
 from app.agent.sql_agent import sql_agent
+from app.config.settings import settings
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -10,10 +12,11 @@ app = FastAPI(
     description="AI-powered Text-to-SQL backend",
     version="1.0.0"
 )
+
 @app.get("/health")
 def health_check():
     """Simple health check endpoint."""
-    return {"status": "ok"}
+    return {"status": "ok", "environment": settings.environment}
 
 @app.post("/api/v1/query", response_model=QueryResponse)
 def ask_database(request: QueryRequest):

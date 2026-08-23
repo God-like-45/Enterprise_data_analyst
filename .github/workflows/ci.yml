@@ -14,8 +14,8 @@ jobs:
       postgres:
         image: postgres:15-alpine
         env:
-          POSTGRES_USER: ai_analyst
-          POSTGRES_PASSWORD: secure_password_123
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_admin_123
           POSTGRES_DB: enterprise_db
         ports:
           - 5432:5432
@@ -46,6 +46,7 @@ jobs:
 
       - name: Initialize Database
         env:
+          ADMIN_DATABASE_URL: postgresql://postgres:postgres_admin_123@localhost:5432/enterprise_db
           DATABASE_URL: postgresql://ai_analyst:secure_password_123@localhost:5432/enterprise_db
           QDRANT_URL: http://localhost:6333
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

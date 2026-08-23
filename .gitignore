@@ -1,0 +1,12 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment Variables
+.env
+
+# Docker/Database Data
+qdrant_data/
+postgres_data/

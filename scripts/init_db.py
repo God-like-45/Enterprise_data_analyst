@@ -33,6 +33,8 @@ def initialize_database():
         conn = psycopg2.connect(ADMIN_DATABASE_URL)
         conn.autocommit = True
         cursor = conn.cursor()
+        #your ok
+
 
         # --- Step 1: Drop existing tables for a clean slate ---
         print("Dropping existing tables...")

@@ -13,7 +13,7 @@ app = FastAPI(
 @app.get("/health")
 def health_check():
     """Simple health check endpoint."""
-    return {"status": "healthy"}
+    return {"status": "ok"}
 
 @app.post("/api/v1/query", response_model=QueryResponse)
 def ask_database(request: QueryRequest):

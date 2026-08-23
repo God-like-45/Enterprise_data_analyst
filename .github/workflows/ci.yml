@@ -44,6 +44,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Initialize Database
+        env:
+          DATABASE_URL: postgresql://ai_analyst:secure_password_123@localhost:5432/enterprise_db
+        run: |
+          python scripts/init_db.py
+
       - name: Run Test Suites
         env:
           DATABASE_URL: postgresql://ai_analyst:secure_password_123@localhost:5432/enterprise_db

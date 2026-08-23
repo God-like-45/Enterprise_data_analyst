@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     
     # --- NEW VARIABLE ---
     groq_api_key: str
+    ui_password: str = "admin"
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

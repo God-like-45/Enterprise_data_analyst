@@ -60,7 +60,10 @@ class VectorStore:
         logger.info("Schema successfully indexed in Qdrant.")
 
     def retrieve_relevant_tables(self, query: str, top_k: int = 3) -> str:
-        """Embeds a question and retrieves relevant tables from Qdrant."""
+        """Embeds a question and retrieves relevant tables from Qdrant, with relationship expansion."""
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        import re
+        
         query_vector = self._get_embedding(query)
         
         search_results = self.qdrant.search(
@@ -70,10 +73,40 @@ class VectorStore:
         )
         
         retrieved_schemas = []
+        retrieved_names = set()
+        
         for hit in search_results:
-            logger.info(f"Retrieved table: {hit.payload['table_name']} (Score: {hit.score:.2f})")
+            name = hit.payload['table_name']
+            retrieved_names.add(name)
             retrieved_schemas.append(hit.payload['schema_text'])
+            logger.info(f"Retrieved table: {name} (Score: {hit.score:.2f})")
             
+        # Relationship Expansion: Find foreign key dependencies
+        extra_tables_needed = set()
+        for schema_text in list(retrieved_schemas):
+            # Look for "-> REFERENCES tablename.columnname"
+            matches = re.findall(r'REFERENCES\s+([a-zA-Z0-9_]+)\.', schema_text)
+            for m in matches:
+                if m not in retrieved_names:
+                    extra_tables_needed.add(m)
+                    
+        # Fetch any missing linked tables directly by name
+        for table_name in extra_tables_needed:
+            try:
+                res, _ = self.qdrant.scroll(
+                    collection_name=self.collection_name,
+                    scroll_filter=Filter(
+                        must=[FieldCondition(key="table_name", match=MatchValue(value=table_name))]
+                    ),
+                    limit=1
+                )
+                if res:
+                    retrieved_schemas.append(res[0].payload['schema_text'])
+                    retrieved_names.add(table_name)
+                    logger.info(f"Relationship Expansion: Auto-included table '{table_name}'")
+            except Exception as e:
+                logger.warning(f"Failed to fetch linked table {table_name}: {e}")
+                
         return "\n\n".join(retrieved_schemas)
 
 vector_store = VectorStore()

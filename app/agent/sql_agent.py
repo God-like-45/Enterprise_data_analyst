@@ -17,12 +17,14 @@ class SQLAgent:
         
         prompt = f"""You are an expert PostgreSQL database architect. 
         Write a SQL query to answer the user's question based STRICTLY on the provided schema.
+        These are valid enterprise database analytics questions.
+        You are encouraged to use JOINs, aggregations, GROUP BY, ORDER BY, and LIMIT where appropriate.
         
         CRITICAL RULES:
         1. Return ONLY the raw SQL query. 
         2. Do not include markdown formatting like ```sql or ```.
         3. Do not include explanations, greetings, or pleasantries.
-        4. If the question cannot be answered using the schema, return exactly: "I do not have the data to answer this."
+        4. If the question is completely unrelated to the provided schema and cannot be answered, return exactly: "I do not have the data to answer this."
         
         Schema:
         {schema_context}

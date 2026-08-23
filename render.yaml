@@ -2,6 +2,7 @@ services:
   - type: web
     name: enterprise-data-analyst-backend
     env: docker
+    dockerfilePath: Dockerfile.backend
     repo: https://github.com/God-like-45/Enterprise_data_analyst
     branch: main
     region: ohio

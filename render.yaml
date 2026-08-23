@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: enterprise-data-analyst-backend
+    env: docker
+    repo: https://github.com/God-like-45/Enterprise_data_analyst
+    branch: main
+    region: ohio
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: UI_PASSWORD
+        sync: false

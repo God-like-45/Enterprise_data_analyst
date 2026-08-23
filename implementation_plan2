@@ -1,0 +1,29 @@
+# Investigation & Implementation Plan: SQL Agent & RAG
+
+## 1. Goal
+Identify and fix why the SQL Agent refuses valid analytics questions with "I do not have the data to answer this."
+
+## 2. Open Questions & Investigation
+The LLM rejects the questions either because:
+1. **Incomplete Context**: The RAG vector search (`top_k=4`) misses crucial tables for JOINs (e.g. misses `customers` or `order_items`).
+2. **Overly Strict Prompt**: The prompt's strict instruction ("based STRICTLY on the provided schema") makes the LLM hesitant to perform JOINs/aggregations if it thinks it lacks explicit permission to combine data.
+
+**I will run a diagnostic script (`scratch/debug_rag.py`)** to see exactly which tables `vector_store.retrieve_relevant_tables()` returns for the 3 failing benchmark questions.
+
+## 3. Proposed Fixes
+
+### A. Fix LLM Prompt (`app/agent/sql_agent.py`)
+Update the prompt to explicitly allow and encourage standard SQL operations:
+- Clarify these are valid enterprise analytics questions.
+- Explicitly allow JOINs, GROUP BY, ORDER BY, LIMIT, and aggregations.
+- Re-word the rejection criteria to apply only when the question is genuinely unrelated to the provided schema.
+
+### B. Fix RAG Retrieval Strategy (`app/rag/vector_store.py`)
+If the diagnostic script shows that RAG misses required tables (e.g., retrieving `orders` but missing `customers`), I will implement **Relationship Expansion**. 
+- Parse the retrieved `schema_text` for `REFERENCES tablename.columnname`.
+- If a retrieved table references another table (or is referenced by one), ensure the related table is included in the LLM context.
+- Increase `top_k` if necessary or recursively fetch linked tables from the vector store using Qdrant's `Filter`.
+
+## 4. Verification
+- Ensure `test_agent.py` and `test_evaluation.py` pass with >66% accuracy (target: 100%).
+- Ensure all 12 other tests remain passing.

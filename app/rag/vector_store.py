@@ -1,5 +1,8 @@
+# pyrefly: ignore [missing-import]
 from qdrant_client import QdrantClient
+# pyrefly: ignore [missing-import]
 from qdrant_client.models import Distance, VectorParams, PointStruct
+# pyrefly: ignore [missing-import]
 from sentence_transformers import SentenceTransformer
 from app.config.settings import settings
 from app.utils.logger import setup_logger
@@ -61,6 +64,7 @@ class VectorStore:
 
     def retrieve_relevant_tables(self, query: str, top_k: int = 3) -> str:
         """Embeds a question and retrieves relevant tables from Qdrant, with relationship expansion."""
+        # pyrefly: ignore [missing-import]
         from qdrant_client.models import Filter, FieldCondition, MatchValue
         import re
         

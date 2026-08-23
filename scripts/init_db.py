@@ -103,20 +103,32 @@ def initialize_database():
             print(f"⚠️ Role setup warning (non-fatal): {role_err}")
 
         # --- Step 5: Populate Qdrant vector store ---
+        print("Waiting for Qdrant to be ready...")
+        import time
+        import requests
+        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+        for i in range(15):
+            try:
+                # Check Qdrant readiness
+                response = requests.get(f"{qdrant_url}/collections", timeout=2)
+                if response.status_code == 200:
+                    break
+            except Exception:
+                pass
+            time.sleep(1)
+        else:
+            raise RuntimeError("Qdrant failed to start in time.")
+
         print("Populating Qdrant Vector Store...")
-        try:
-            # Set DATABASE_URL to the app URL so schema extractor uses the right connection
-            os.environ["DATABASE_URL"] = APP_DATABASE_URL
+        # Set DATABASE_URL to the app URL so schema extractor uses the right connection
+        os.environ["DATABASE_URL"] = APP_DATABASE_URL
 
-            from app.services.schema_extractor import schema_extractor
-            from app.rag.vector_store import vector_store
+        from app.services.schema_extractor import schema_extractor
+        from app.rag.vector_store import vector_store
 
-            tables = schema_extractor.extract_schema()
-            vector_store.index_schema(tables)  # Fixed: was store_schema()
-            print(f"✅ Qdrant populated with {len(tables)} tables successfully!")
-        except Exception as qdrant_err:
-            print(f"⚠️ Qdrant population warning: {qdrant_err}")
-            print("The database is ready, but the vector store may need manual population.")
+        tables = schema_extractor.extract_schema()
+        vector_store.index_schema(tables)  # Fixed: was store_schema()
+        print(f"✅ Qdrant populated with {len(tables)} tables successfully!")
 
     except Exception as e:
         print(f"❌ Error: {e}")

@@ -46,6 +46,8 @@ def test_agent_evaluation_benchmark():
         print(f"Status: {'PASSED ✅' if is_success else 'FAILED ❌'}")
         print(f"Latency: {duration:.2f} seconds")
         print(f"Generated SQL:\n{generated_sql}")
+        if not is_success:
+            print(f"Error:\n{result.get('error', 'No error reported')}")
         
         if is_success:
             successful_runs += 1

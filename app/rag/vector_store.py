@@ -2,8 +2,7 @@
 from qdrant_client import QdrantClient
 # pyrefly: ignore [missing-import]
 from qdrant_client.models import Distance, VectorParams, PointStruct
-# pyrefly: ignore [missing-import]
-from sentence_transformers import SentenceTransformer
+import requests
 from app.config.settings import settings
 from app.utils.logger import setup_logger
 from app.schemas.database_schema import TableSchema
@@ -13,10 +12,6 @@ logger = setup_logger(__name__)
 class VectorStore:
     def __init__(self):
         self.qdrant = QdrantClient(url=settings.qdrant_url)
-        
-        # Load a fast, free, local open-source embedding model
-        logger.info("Loading local embedding model...")
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
         
         self.collection_name = "database_schema_v2"
         self._ensure_collection_exists()
@@ -35,13 +30,26 @@ class VectorStore:
             )
 
     def _get_embedding(self, text: str) -> list[float]:
-        """Converts text into a vector using our local model."""
-        # encode() returns a numpy array, we convert it to a standard Python list
-        return self.embedding_model.encode(text).tolist()
+        """Converts text into a vector using Hugging Face's free external API (Zero local RAM)."""
+        model_id = "sentence-transformers/all-MiniLM-L6-v2"
+        api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
+        
+        try:
+            response = requests.post(
+                api_url, 
+                json={"inputs": [text], "options": {"wait_for_model": True}}
+            )
+            response.raise_for_status()
+            # The API returns a list of embeddings. Since we sent one string, we extract index 0.
+            return response.json()[0]
+        except Exception as e:
+            logger.error(f"Error fetching embeddings from API: {e}")
+            # Fallback to a zero-vector so the Qdrant insertion doesn't crash on failure
+            return [0.0] * 384
 
     def index_schema(self, tables: list[TableSchema]):
         """Embeds and uploads database tables to Qdrant."""
-        logger.info(f"Embedding and indexing {len(tables)} tables locally...")
+        logger.info(f"Embedding and indexing {len(tables)} tables via API...")
         points = []
         
         for idx, table in enumerate(tables):

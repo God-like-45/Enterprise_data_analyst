@@ -11,7 +11,16 @@ logger = setup_logger(__name__)
 
 class VectorStore:
     def __init__(self):
-        self.qdrant = QdrantClient(url=settings.qdrant_url)
+        # Fallback to in-memory Qdrant if running locally or without a remote Qdrant Cloud service
+        if not settings.qdrant_url or "localhost" in settings.qdrant_url:
+            logger.info("Initializing in-memory Qdrant instance for cloud/lightweight deployment...")
+            self.qdrant = QdrantClient(":memory:")
+        else:
+            logger.info(f"Connecting to remote Qdrant instance at {settings.qdrant_url}")
+            self.qdrant = QdrantClient(
+                url=settings.qdrant_url,
+                api_key=getattr(settings, "qdrant_api_key", None)
+            )
         
         self.collection_name = "database_schema_v2"
         self._ensure_collection_exists()
@@ -24,13 +33,13 @@ class VectorStore:
             self.qdrant.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=VectorParams(
-                    size=384, # The exact output size of all-MiniLM-L6-v2
+                    size=384, # The exact output dimension of all-MiniLM-L6-v2
                     distance=Distance.COSINE
                 ),
             )
 
     def _get_embedding(self, text: str) -> list[float]:
-        """Converts text into a vector using Hugging Face's free external API (Zero local RAM)."""
+        """Converts text into a vector using Hugging Face's free external API (Zero local RAM required)."""
         model_id = "sentence-transformers/all-MiniLM-L6-v2"
         api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
         
@@ -40,11 +49,11 @@ class VectorStore:
                 json={"inputs": [text], "options": {"wait_for_model": True}}
             )
             response.raise_for_status()
-            # The API returns a list of embeddings. Since we sent one string, we extract index 0.
+            # The API returns a list of embeddings. Extract index 0 for single string input.
             return response.json()[0]
         except Exception as e:
             logger.error(f"Error fetching embeddings from API: {e}")
-            # Fallback to a zero-vector so the Qdrant insertion doesn't crash on failure
+            # Fallback to a zero-vector so the Qdrant insertion doesn't crash on network failure
             return [0.0] * 384
 
     def index_schema(self, tables: list[TableSchema]):

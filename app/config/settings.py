@@ -1,4 +1,4 @@
-
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
     database_url: str 
-    openai_api_key: str
+    openai_api_key: Optional[str] = None
     qdrant_url: str = "http://localhost:6333"
     
     # --- NEW VARIABLE ---

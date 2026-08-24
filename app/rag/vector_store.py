@@ -1,8 +1,9 @@
 # pyrefly: ignore [missing-import]
 from qdrant_client import QdrantClient
 # pyrefly: ignore [missing-import]
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 import requests
+import re
 from app.config.settings import settings
 from app.utils.logger import setup_logger
 from app.schemas.database_schema import TableSchema
@@ -11,7 +12,8 @@ logger = setup_logger(__name__)
 
 class VectorStore:
     def __init__(self):
-        # Fallback to in-memory Qdrant if running locally or without a remote Qdrant Cloud service
+        # --- QDRANT CONNECTION ---
+        # Fallback to in-memory if running locally or without a remote cloud service
         if not settings.qdrant_url or "localhost" in settings.qdrant_url:
             logger.info("Initializing in-memory Qdrant instance for cloud/lightweight deployment...")
             self.qdrant = QdrantClient(":memory:")
@@ -24,6 +26,19 @@ class VectorStore:
         
         self.collection_name = "database_schema_v2"
         self._ensure_collection_exists()
+
+        # --- SMART EMBEDDING ROUTER ---
+        self.use_local_model = False
+        try:
+            # If running in GitHub Actions where we explicitly install it
+            # pyrefly: ignore [missing-import]
+            from sentence_transformers import SentenceTransformer
+            logger.info("PyTorch detected. Loading local model for high-accuracy testing...")
+            self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+            self.use_local_model = True
+        except ImportError:
+            # If running on Render where it's absent from requirements.txt
+            logger.info("PyTorch missing. Falling back to Hugging Face API for lightweight production...")
 
     def _ensure_collection_exists(self):
         """Creates the Qdrant collection if it doesn't already exist."""
@@ -39,14 +54,19 @@ class VectorStore:
             )
 
     def _get_embedding(self, text: str) -> list[float]:
-        """Converts text into a vector using Hugging Face's free external API (Zero local RAM required)."""
+        """Routes vector generation dynamically based on the environment."""
+        if self.use_local_model:
+            return self.embedding_model.encode(text).tolist()
+            
+        # API Fallback for Render
         model_id = "sentence-transformers/all-MiniLM-L6-v2"
         api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_id}"
         
         try:
             response = requests.post(
                 api_url, 
-                json={"inputs": [text], "options": {"wait_for_model": True}}
+                json={"inputs": [text], "options": {"wait_for_model": True}},
+                timeout=10
             )
             response.raise_for_status()
             # The API returns a list of embeddings. Extract index 0 for single string input.
@@ -58,7 +78,7 @@ class VectorStore:
 
     def index_schema(self, tables: list[TableSchema]):
         """Embeds and uploads database tables to Qdrant."""
-        logger.info(f"Embedding and indexing {len(tables)} tables via API...")
+        logger.info(f"Embedding and indexing {len(tables)} tables...")
         points = []
         
         for idx, table in enumerate(tables):
@@ -81,10 +101,6 @@ class VectorStore:
 
     def retrieve_relevant_tables(self, query: str, top_k: int = 3) -> str:
         """Embeds a question and retrieves relevant tables from Qdrant, with relationship expansion."""
-        # pyrefly: ignore [missing-import]
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
-        import re
-        
         query_vector = self._get_embedding(query)
         
         search_results = self.qdrant.search(

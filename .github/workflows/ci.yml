@@ -43,6 +43,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # Inject heavy ML libraries locally so the CI runner can use 
+          # the local PyTorch model to pass high-accuracy evaluation tests
+          pip install sentence-transformers torch
 
       - name: Initialize Database
         env:

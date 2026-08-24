@@ -12,17 +12,26 @@ logger = setup_logger(__name__)
 
 class VectorStore:
     def __init__(self):
-        # --- QDRANT CONNECTION ---
-        # Fallback to in-memory if running locally or without a remote cloud service
-        if not settings.qdrant_url or "localhost" in settings.qdrant_url:
-            logger.info("Initializing in-memory Qdrant instance for cloud/lightweight deployment...")
-            self.qdrant = QdrantClient(":memory:")
+        # --- QDRANT CONNECTION WITH DYNAMIC FALLBACK ---
+        self.qdrant = None
+        if settings.qdrant_url:
+            try:
+                logger.info(f"Connecting to Qdrant instance at {settings.qdrant_url}...")
+                client = QdrantClient(
+                    url=settings.qdrant_url,
+                    api_key=getattr(settings, "qdrant_api_key", None),
+                    timeout=5
+                )
+                # Health check to ensure the service is actually responding
+                client.get_collections()
+                self.qdrant = client
+                logger.info("Successfully connected to Qdrant service.")
+            except Exception as e:
+                logger.warning(f"Could not connect to Qdrant at {settings.qdrant_url}: {e}. Falling back to in-memory Qdrant.")
+                self.qdrant = QdrantClient(":memory:")
         else:
-            logger.info(f"Connecting to remote Qdrant instance at {settings.qdrant_url}")
-            self.qdrant = QdrantClient(
-                url=settings.qdrant_url,
-                api_key=getattr(settings, "qdrant_api_key", None)
-            )
+            logger.info("No QDRANT_URL configured. Initializing in-memory Qdrant instance...")
+            self.qdrant = QdrantClient(":memory:")
         
         self.collection_name = "database_schema_v2"
         self._ensure_collection_exists()
@@ -48,7 +57,7 @@ class VectorStore:
             self.qdrant.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=VectorParams(
-                    size=384, # The exact output dimension of all-MiniLM-L6-v2
+                    size=384, # Output dimension of all-MiniLM-L6-v2
                     distance=Distance.COSINE
                 ),
             )
@@ -69,11 +78,9 @@ class VectorStore:
                 timeout=10
             )
             response.raise_for_status()
-            # The API returns a list of embeddings. Extract index 0 for single string input.
             return response.json()[0]
         except Exception as e:
             logger.error(f"Error fetching embeddings from API: {e}")
-            # Fallback to a zero-vector so the Qdrant insertion doesn't crash on network failure
             return [0.0] * 384
 
     def index_schema(self, tables: list[TableSchema]):
@@ -121,7 +128,6 @@ class VectorStore:
         # Relationship Expansion: Find foreign key dependencies
         extra_tables_needed = set()
         for schema_text in list(retrieved_schemas):
-            # Look for "-> REFERENCES tablename.columnname"
             matches = re.findall(r'REFERENCES\s+([a-zA-Z0-9_]+)\.', schema_text)
             for m in matches:
                 if m not in retrieved_names:
